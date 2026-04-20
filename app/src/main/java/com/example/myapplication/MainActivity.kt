@@ -39,6 +39,8 @@ class MainActivity : ComponentActivity() {
         MainViewModel.Factory(
             voiceServiceApi = graph.voiceServiceApi,
             overlayServiceApi = graph.overlayServiceApi,
+            speechToTextApi = graph.speechToTextApi,
+            appLauncherApi = graph.appLauncherApi,
         )
     }
 
@@ -57,6 +59,7 @@ class MainActivity : ComponentActivity() {
             when (pendingAudioAction) {
                 AudioPermissionAction.START_VOICE_SERVICE -> voiceViewModel.startVoice(isGranted)
                 AudioPermissionAction.START_PROMPT_STT -> mediaViewModel.startPromptListening(isGranted)
+                AudioPermissionAction.START_APP_COMMAND_STT -> voiceViewModel.startAppCommandListening(isGranted)
                 null -> Unit
             }
             pendingAudioAction = null
@@ -108,6 +111,8 @@ class MainActivity : ComponentActivity() {
                                 onReadAudioBytes = voiceViewModel::readLastAudioBytesAndLog,
                                 onOpenOverlaySettings = voiceViewModel::openOverlaySettings,
                                 onShowOverlay = voiceViewModel::showOverlay,
+                                onStartAppCommandListening = ::onStartAppCommandListeningClicked,
+                                onStopAppCommandListening = voiceViewModel::stopAppCommandListening,
                                 onClearLogs = voiceViewModel::clearLogs,
                             )
 
@@ -177,6 +182,21 @@ class MainActivity : ComponentActivity() {
         requestAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
     }
 
+    private fun onStartAppCommandListeningClicked() {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.RECORD_AUDIO,
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasPermission) {
+            voiceViewModel.startAppCommandListening(audioPermissionGranted = true)
+            return
+        }
+
+        pendingAudioAction = AudioPermissionAction.START_APP_COMMAND_STT
+        requestAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
+    }
+
     private fun onOpenCameraClicked(lifecycleOwner: LifecycleOwner, previewView: PreviewView) {
         val hasPermission = ContextCompat.checkSelfPermission(
             this,
@@ -204,5 +224,6 @@ class MainActivity : ComponentActivity() {
     private enum class AudioPermissionAction {
         START_VOICE_SERVICE,
         START_PROMPT_STT,
+        START_APP_COMMAND_STT,
     }
 }

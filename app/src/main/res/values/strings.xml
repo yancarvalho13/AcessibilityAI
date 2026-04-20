@@ -11,6 +11,13 @@
     <string name="voice_start">Start</string>
     <string name="voice_stop">Stop</string>
     <string name="voice_read_audio_bytes">Read last audio bytes</string>
+    <string name="app_command_title">Abertura de apps por voz</string>
+    <string name="app_command_idle">Status: aguardando comando</string>
+    <string name="app_command_listening">Status: escutando comando...</string>
+    <string name="app_command_partial">Parcial: %1$s</string>
+    <string name="app_command_last">Ultimo comando: %1$s</string>
+    <string name="app_command_start">Escutar comando</string>
+    <string name="app_command_stop">Parar comando</string>
     <string name="overlay_permission_granted">Overlay permission: granted</string>
     <string name="overlay_permission_missing">Overlay permission: missing</string>
     <string name="overlay_open_permission">Permission</string>

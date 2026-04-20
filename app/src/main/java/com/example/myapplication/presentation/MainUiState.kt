@@ -6,6 +6,9 @@ data class MainUiState(
     val lastAudioPath: String? = null,
     val lastAudioSizeBytes: Long? = null,
     val overlayPermissionGranted: Boolean = false,
+    val isAppCommandListening: Boolean = false,
+    val appCommandPartialText: String = "",
+    val appCommandLastText: String = "",
     val logs: List<String> = emptyList(),
     val infoMessage: String? = null,
 )

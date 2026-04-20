@@ -2,12 +2,14 @@ package com.example.myapplication.app
 
 import android.content.Context
 import com.example.myapplication.data.analysis.GeminiSceneAnalysisApi
+import com.example.myapplication.data.app.AndroidAppLauncherApi
 import com.example.myapplication.data.camera.AndroidCameraServiceApi
 import com.example.myapplication.data.overlay.AndroidOverlayServiceApi
 import com.example.myapplication.data.speech.AndroidSpeechToTextApi
 import com.example.myapplication.data.speech.AndroidTextToSpeechApi
 import com.example.myapplication.data.voice.AndroidVoiceServiceApi
 import com.example.myapplication.domain.analysis.SceneAnalysisApi
+import com.example.myapplication.domain.app.AppLauncherApi
 import com.example.myapplication.domain.camera.CameraServiceApi
 import com.example.myapplication.domain.overlay.OverlayServiceApi
 import com.example.myapplication.domain.speech.SpeechToTextApi
@@ -39,5 +41,9 @@ class ServiceGraph(context: Context) {
 
     val textToSpeechApi: TextToSpeechApi by lazy {
         AndroidTextToSpeechApi(appContext)
+    }
+
+    val appLauncherApi: AppLauncherApi by lazy {
+        AndroidAppLauncherApi(appContext)
     }
 }

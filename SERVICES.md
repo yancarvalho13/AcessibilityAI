@@ -6,7 +6,7 @@ Este documento descreve como usar os servicos e APIs do projeto, com foco em arq
 
 - `domain/*`: contratos e modelos (sem detalhes de Android, exceto tipos necessarios de camera).
 - `data/*`: implementacoes Android dos contratos.
-- `app/ServiceGraph`: ponto unico para obter APIs (`voiceServiceApi`, `overlayServiceApi`, `cameraServiceApi`, `sceneAnalysisApi`).
+- `app/ServiceGraph`: ponto unico para obter APIs (`voiceServiceApi`, `overlayServiceApi`, `cameraServiceApi`, `sceneAnalysisApi`, `speechToTextApi`, `textToSpeechApi`, `appLauncherApi`).
 - `presentation/*`: `ViewModel` consome somente interfaces de dominio.
 
 ## Gemini Scene Analysis API
@@ -26,8 +26,8 @@ Arquivos principais:
 
 ```kotlin
 interface SceneAnalysisApi {
-    suspend fun analyzePhoto(photoBytes: ByteArray): String
-    suspend fun analyzeVideo(videoBytes: ByteArray): String
+    suspend fun analyzePhoto(photoBytes: ByteArray, prompt: String? = null): String
+    suspend fun analyzeVideo(videoBytes: ByteArray, prompt: String? = null): String
 }
 ```
 
@@ -220,6 +220,31 @@ interface TextToSpeechApi {
     fun release()
 }
 ```
+
+## App Launcher API
+
+Arquivos principais:
+
+- `app/src/main/java/com/example/myapplication/domain/app/AppLauncherApi.kt`
+- `app/src/main/java/com/example/myapplication/data/app/AndroidAppLauncherApi.kt`
+
+### O que faz
+
+- Recebe comando de voz convertido para texto e tenta identificar palavra-chave de app.
+- Atualmente reconhece `whatsapp` (inclui variacoes como `whatsaap`, `zap`, `wpp`) e `youtube`.
+- Abre o app correspondente via `PackageManager`.
+
+### API
+
+```kotlin
+interface AppLauncherApi {
+    fun openWhatsApp(): AppLaunchResult
+    fun openYouTube(): AppLaunchResult
+    fun openByVoiceCommand(command: String): AppLaunchResult
+}
+```
+
+`AppLaunchResult` retorna o status (`Opened`, `AppNotInstalled`, `NoMatch`) e o app alvo quando aplicavel.
 
 ## Permissoes
 

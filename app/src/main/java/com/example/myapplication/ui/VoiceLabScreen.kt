@@ -31,6 +31,8 @@ fun VoiceLabScreen(
     onReadAudioBytes: () -> Unit,
     onOpenOverlaySettings: () -> Unit,
     onShowOverlay: () -> Unit,
+    onStartAppCommandListening: () -> Unit,
+    onStopAppCommandListening: () -> Unit,
     onClearLogs: () -> Unit,
 ) {
     Column(
@@ -99,6 +101,61 @@ fun VoiceLabScreen(
                     onClick = onReadAudioBytes,
                 ) {
                     Text(stringResource(R.string.voice_read_audio_bytes))
+                }
+            }
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.app_command_title),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = if (uiState.isAppCommandListening) {
+                        stringResource(R.string.app_command_listening)
+                    } else {
+                        stringResource(R.string.app_command_idle)
+                    },
+                )
+
+                if (uiState.appCommandPartialText.isNotBlank()) {
+                    Text(
+                        text = stringResource(R.string.app_command_partial, uiState.appCommandPartialText),
+                    )
+                }
+
+                if (uiState.appCommandLastText.isNotBlank()) {
+                    Text(
+                        text = stringResource(R.string.app_command_last, uiState.appCommandLastText),
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        onClick = onStartAppCommandListening,
+                    ) {
+                        Text(stringResource(R.string.app_command_start))
+                    }
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        onClick = onStopAppCommandListening,
+                    ) {
+                        Text(stringResource(R.string.app_command_stop))
+                    }
                 }
             }
         }
