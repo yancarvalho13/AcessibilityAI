@@ -6,8 +6,45 @@ Este documento descreve como usar os servicos e APIs do projeto, com foco em arq
 
 - `domain/*`: contratos e modelos (sem detalhes de Android, exceto tipos necessarios de camera).
 - `data/*`: implementacoes Android dos contratos.
-- `app/ServiceGraph`: ponto unico para obter APIs (`voiceServiceApi`, `overlayServiceApi`, `cameraServiceApi`).
+- `app/ServiceGraph`: ponto unico para obter APIs (`voiceServiceApi`, `overlayServiceApi`, `cameraServiceApi`, `sceneAnalysisApi`).
 - `presentation/*`: `ViewModel` consome somente interfaces de dominio.
+
+## Gemini Scene Analysis API
+
+Arquivos principais:
+
+- `app/src/main/java/com/example/myapplication/domain/analysis/SceneAnalysisApi.kt`
+- `app/src/main/java/com/example/myapplication/data/analysis/GeminiSceneAnalysisApi.kt`
+
+### O que ele faz
+
+- Recebe bytes de foto ou video.
+- Envia para a API do Gemini com prompt minimo vindo de `.env`.
+- Retorna texto com a analise do que esta acontecendo na foto ou no video.
+
+### API
+
+```kotlin
+interface SceneAnalysisApi {
+    suspend fun analyzePhoto(photoBytes: ByteArray): String
+    suspend fun analyzeVideo(videoBytes: ByteArray): String
+}
+```
+
+### Configuracao `.env`
+
+Arquivo na raiz do projeto:
+
+```dotenv
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_API_VERSION=v1beta
+GEMINI_PHOTO_PROMPT=O que esta acontecendo nesta foto?
+GEMINI_VIDEO_PROMPT=O que esta acontecendo neste video?
+```
+
+Esses valores sao injetados no `BuildConfig` no build (`app/build.gradle.kts`).
+Se um modelo/version falhar, a implementacao tenta fallback automatico entre `v1beta`/`v1` e modelo padrao `gemini-2.5-flash`.
 
 ## Voice Service
 
@@ -153,6 +190,7 @@ Manifesto:
 
 - `android.permission.RECORD_AUDIO`
 - `android.permission.CAMERA`
+- `android.permission.INTERNET`
 - `android.permission.SYSTEM_ALERT_WINDOW`
 - `android.permission.FOREGROUND_SERVICE`
 - `android.permission.FOREGROUND_SERVICE_MICROPHONE`
@@ -161,3 +199,8 @@ Em runtime:
 
 - Microfone e camera precisam ser solicitados em runtime na `Activity`.
 - Overlay precisa ser concedido na tela de configuracao do Android.
+
+## Seguranca da chave
+
+- O arquivo `.env` esta no `.gitignore` e nao deve ser versionado.
+- Para equipe, compartilhe somente um `.env` local ou um secret manager.
