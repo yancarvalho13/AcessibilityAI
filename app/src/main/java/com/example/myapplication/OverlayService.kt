@@ -9,12 +9,11 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
-import androidx.core.os.postDelayed
 import android.os.Handler
 import android.os.Looper
 
 class OverlayService : Service() {
-    private lateinit var  windowManager: WindowManager
+    private lateinit var windowManager: WindowManager
     private var view: View? = null
     private var isAttached = false
 

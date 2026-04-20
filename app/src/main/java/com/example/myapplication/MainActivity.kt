@@ -1,68 +1,73 @@
 package com.example.myapplication
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Bundle
-import android.provider.Settings
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.core.content.ContextCompat
-class MainActivity : AppCompatActivity() {
+import com.example.myapplication.app.MyApplication
+import com.example.myapplication.presentation.MainViewModel
+import com.example.myapplication.ui.VoiceLabScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+
+class MainActivity : ComponentActivity() {
+    private val viewModel: MainViewModel by viewModels {
+        val graph = (application as MyApplication).serviceGraph
+        MainViewModel.Factory(
+            voiceServiceApi = graph.voiceServiceApi,
+            overlayServiceApi = graph.overlayServiceApi,
+        )
+    }
+
+    private val requestAudioPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            viewModel.startVoice(audioPermissionGranted = isGranted)
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
 
-        checkPermissions()
+        setContent {
+            val uiState = viewModel.uiState.collectAsStateWithLifecycle()
+
+            MaterialTheme {
+                Surface {
+                    VoiceLabScreen(
+                        uiState = uiState.value,
+                        onStartVoice = { onStartVoiceClicked() },
+                        onStopVoice = viewModel::stopVoice,
+                        onOpenOverlaySettings = viewModel::openOverlaySettings,
+                        onShowOverlay = viewModel::showOverlay,
+                    )
+                }
+            }
+        }
     }
 
-    private fun checkPermissions() {
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshOverlayPermission()
+        viewModel.dismissInfoMessage()
+    }
 
-        if (!Settings.canDrawOverlays(this)) {
-            val intent = Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:$packageName")
-            )
-            startActivity(intent)
+    private fun onStartVoiceClicked() {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.RECORD_AUDIO,
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasPermission) {
+            viewModel.startVoice(audioPermissionGranted = true)
             return
         }
 
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.RECORD_AUDIO
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.RECORD_AUDIO),
-                1001
-            )
-        } else {
-            startServices()
-        }
-    }
-
-    private fun startServices() {
-        ContextCompat.startForegroundService(
-            this,
-            Intent(this, VoiceCommandService::class.java)
-        )
-
-        startService(Intent(this, OverlayService::class.java))
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 1001 &&
-            grantResults.isNotEmpty() &&
-            grantResults[0] == PackageManager.PERMISSION_GRANTED
-        ) {
-            startServices()
-        }
+        requestAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
     }
 }
