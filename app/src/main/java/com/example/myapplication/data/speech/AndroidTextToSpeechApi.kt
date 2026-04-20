@@ -18,6 +18,7 @@ class AndroidTextToSpeechApi(
     override val state: StateFlow<TextToSpeechState> = _state.asStateFlow()
 
     private var textToSpeech: TextToSpeech? = null
+    private val pendingSpeechQueue = ArrayDeque<String>()
 
     override fun speak(text: String) {
         if (text.isBlank()) {
@@ -27,6 +28,7 @@ class AndroidTextToSpeechApi(
 
         val tts = getOrCreateTextToSpeech()
         if (!_state.value.isInitialized) {
+            pendingSpeechQueue.addLast(text)
             _state.value = _state.value.copy(errorMessage = "TTS ainda inicializando")
             return
         }
@@ -47,6 +49,7 @@ class AndroidTextToSpeechApi(
         textToSpeech?.stop()
         textToSpeech?.shutdown()
         textToSpeech = null
+        pendingSpeechQueue.clear()
         _state.value = TextToSpeechState()
     }
 
@@ -111,8 +114,17 @@ class AndroidTextToSpeechApi(
             )
 
             _state.value = _state.value.copy(isInitialized = true, errorMessage = null)
+            flushPendingSpeechQueue(tts)
         }.also {
             textToSpeech = it
+        }
+    }
+
+    private fun flushPendingSpeechQueue(tts: TextToSpeech) {
+        while (pendingSpeechQueue.isNotEmpty()) {
+            val next = pendingSpeechQueue.removeFirst()
+            val utteranceId = UUID.randomUUID().toString()
+            tts.speak(next, TextToSpeech.QUEUE_ADD, null, utteranceId)
         }
     }
 }

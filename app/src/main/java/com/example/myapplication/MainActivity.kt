@@ -1,6 +1,7 @@
 package com.example.myapplication
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -26,6 +27,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.myapplication.app.MyApplication
 import com.example.myapplication.presentation.MainViewModel
 import com.example.myapplication.presentation.MediaAnalysisViewModel
+import com.example.myapplication.service.HeadlessVoiceService
 import com.example.myapplication.ui.MediaAnalysisScreen
 import com.example.myapplication.ui.VoiceLabScreen
 
@@ -39,8 +41,6 @@ class MainActivity : ComponentActivity() {
         MainViewModel.Factory(
             voiceServiceApi = graph.voiceServiceApi,
             overlayServiceApi = graph.overlayServiceApi,
-            speechToTextApi = graph.speechToTextApi,
-            appLauncherApi = graph.appLauncherApi,
         )
     }
 
@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
             when (pendingAudioAction) {
                 AudioPermissionAction.START_VOICE_SERVICE -> voiceViewModel.startVoice(isGranted)
                 AudioPermissionAction.START_PROMPT_STT -> mediaViewModel.startPromptListening(isGranted)
-                AudioPermissionAction.START_APP_COMMAND_STT -> voiceViewModel.startAppCommandListening(isGranted)
+                AudioPermissionAction.START_HEADLESS_SESSION -> if (isGranted) startHeadlessSession()
                 null -> Unit
             }
             pendingAudioAction = null
@@ -111,8 +111,8 @@ class MainActivity : ComponentActivity() {
                                 onReadAudioBytes = voiceViewModel::readLastAudioBytesAndLog,
                                 onOpenOverlaySettings = voiceViewModel::openOverlaySettings,
                                 onShowOverlay = voiceViewModel::showOverlay,
-                                onStartAppCommandListening = ::onStartAppCommandListeningClicked,
-                                onStopAppCommandListening = voiceViewModel::stopAppCommandListening,
+                                onStartHeadlessSession = ::ensureHeadlessSessionStarted,
+                                onStopHeadlessSession = ::stopHeadlessSession,
                                 onClearLogs = voiceViewModel::clearLogs,
                             )
 
@@ -138,6 +138,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+
+        ensureHeadlessSessionStarted()
     }
 
     override fun onResume() {
@@ -182,19 +184,31 @@ class MainActivity : ComponentActivity() {
         requestAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
     }
 
-    private fun onStartAppCommandListeningClicked() {
+    private fun ensureHeadlessSessionStarted() {
         val hasPermission = ContextCompat.checkSelfPermission(
             this,
             Manifest.permission.RECORD_AUDIO,
         ) == PackageManager.PERMISSION_GRANTED
 
         if (hasPermission) {
-            voiceViewModel.startAppCommandListening(audioPermissionGranted = true)
+            startHeadlessSession()
             return
         }
 
-        pendingAudioAction = AudioPermissionAction.START_APP_COMMAND_STT
+        pendingAudioAction = AudioPermissionAction.START_HEADLESS_SESSION
         requestAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
+    }
+
+    private fun startHeadlessSession() {
+        val intent = Intent(this, HeadlessVoiceService::class.java)
+            .setAction(HeadlessVoiceService.ACTION_START_SESSION)
+        ContextCompat.startForegroundService(this, intent)
+        voiceViewModel.appendHeadlessLog("Headless: sessao iniciada")
+    }
+
+    private fun stopHeadlessSession() {
+        stopService(Intent(this, HeadlessVoiceService::class.java))
+        voiceViewModel.appendHeadlessLog("Headless: sessao encerrada")
     }
 
     private fun onOpenCameraClicked(lifecycleOwner: LifecycleOwner, previewView: PreviewView) {
@@ -224,6 +238,6 @@ class MainActivity : ComponentActivity() {
     private enum class AudioPermissionAction {
         START_VOICE_SERVICE,
         START_PROMPT_STT,
-        START_APP_COMMAND_STT,
+        START_HEADLESS_SESSION,
     }
 }

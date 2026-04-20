@@ -52,6 +52,10 @@
         <service android:name=".OverlayService"
             android:exported="false"
             />
+        <service
+            android:name=".service.HeadlessVoiceService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
     </application>
 
 </manifest>

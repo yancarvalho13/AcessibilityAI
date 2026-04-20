@@ -31,8 +31,8 @@ fun VoiceLabScreen(
     onReadAudioBytes: () -> Unit,
     onOpenOverlaySettings: () -> Unit,
     onShowOverlay: () -> Unit,
-    onStartAppCommandListening: () -> Unit,
-    onStopAppCommandListening: () -> Unit,
+    onStartHeadlessSession: () -> Unit,
+    onStopHeadlessSession: () -> Unit,
     onClearLogs: () -> Unit,
 ) {
     Column(
@@ -117,28 +117,10 @@ fun VoiceLabScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.app_command_title),
+                    text = stringResource(R.string.headless_title),
                     style = MaterialTheme.typography.titleMedium,
                 )
-                Text(
-                    text = if (uiState.isAppCommandListening) {
-                        stringResource(R.string.app_command_listening)
-                    } else {
-                        stringResource(R.string.app_command_idle)
-                    },
-                )
-
-                if (uiState.appCommandPartialText.isNotBlank()) {
-                    Text(
-                        text = stringResource(R.string.app_command_partial, uiState.appCommandPartialText),
-                    )
-                }
-
-                if (uiState.appCommandLastText.isNotBlank()) {
-                    Text(
-                        text = stringResource(R.string.app_command_last, uiState.appCommandLastText),
-                    )
-                }
+                Text(text = stringResource(R.string.headless_description))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -146,15 +128,15 @@ fun VoiceLabScreen(
                 ) {
                     Button(
                         modifier = Modifier.weight(1f),
-                        onClick = onStartAppCommandListening,
+                        onClick = onStartHeadlessSession,
                     ) {
-                        Text(stringResource(R.string.app_command_start))
+                        Text(stringResource(R.string.headless_start))
                     }
                     Button(
                         modifier = Modifier.weight(1f),
-                        onClick = onStopAppCommandListening,
+                        onClick = onStopHeadlessSession,
                     ) {
-                        Text(stringResource(R.string.app_command_stop))
+                        Text(stringResource(R.string.headless_stop))
                     }
                 }
             }

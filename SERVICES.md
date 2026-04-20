@@ -246,6 +246,39 @@ interface AppLauncherApi {
 
 `AppLaunchResult` retorna o status (`Opened`, `AppNotInstalled`, `NoMatch`) e o app alvo quando aplicavel.
 
+## Headless Voice Session (Step Engine)
+
+Arquivos principais:
+
+- `app/src/main/java/com/example/myapplication/service/HeadlessVoiceService.kt`
+- `app/src/main/java/com/example/myapplication/service/HeadlessCommandExecutor.kt`
+- `app/src/main/java/com/example/myapplication/domain/session/VoiceSessionEngine.kt`
+- `app/src/main/java/com/example/myapplication/domain/session/steps/BootStep.kt`
+- `app/src/main/java/com/example/myapplication/domain/session/steps/ListeningStep.kt`
+- `app/src/main/java/com/example/myapplication/domain/session/steps/ExecuteCommandStep.kt`
+- `app/src/main/java/com/example/myapplication/domain/session/steps/EndedStep.kt`
+
+### Como funciona
+
+- Ao abrir o app, a Activity inicia a sessao headless (se `RECORD_AUDIO` estiver concedida).
+- O engine entra no `BootStep` e fala `"Estou escutando"`.
+- Em seguida entra no `ListeningStep`, inicia STT e fica aguardando comando.
+- Ao reconhecer comando, entra no `ExecuteCommandStep`, executa acao e volta para `ListeningStep`.
+- Para comando `abrir camera`, o fluxo muda para steps especificos:
+  - `CameraAwaitPhotoStep`: fala para dizer `tirar foto`.
+  - `CapturePhotoStep`: captura a foto em modo headless.
+  - `PhotoPromptStep`: escuta prompt livre e envia para analise Gemini da foto capturada.
+- Cada ciclo de escuta reseta timeout de 30 segundos.
+- Sem novos comandos por 30 segundos, o engine encerra automaticamente a sessao (`EndedStep`).
+
+### Intents de voz atuais no headless
+
+- Abrir WhatsApp
+- Abrir YouTube
+- Abrir camera -> tirar foto -> prompt por voz -> analise da foto
+- Parar sessao
+- Comandos de video continuam com feedback orientando uso da aba `Foto e Video`.
+
 ## Permissoes
 
 Manifesto:
