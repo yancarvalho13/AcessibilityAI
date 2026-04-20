@@ -1,6 +1,8 @@
 <resources>
     <string name="app_name">Voice Accessibility Lab</string>
     <string name="voice_lab_title">Voice and Overlay Lab</string>
+    <string name="voice_tab_title">Voz</string>
+    <string name="media_tab_title">Foto e Video</string>
     <string name="voice_recording_status">Voice service: recording</string>
     <string name="voice_stopped_status">Voice service: stopped</string>
     <string name="voice_level">Voice level: %1$d</string>
@@ -17,6 +19,7 @@
     <string name="camera_status_closed">Camera: closed</string>
     <string name="camera_video_recording">Video recording: active</string>
     <string name="camera_video_idle">Video recording: stopped</string>
+    <string name="last_photo_size">Last photo size: %1$d bytes</string>
     <string name="last_video_path">Last video path: %1$s</string>
     <string name="last_video_size">Last video size: %1$d bytes</string>
     <string name="camera_open">Open camera</string>
@@ -31,6 +34,18 @@
     <string name="gemini_status_analyzing">Gemini is analyzing...</string>
     <string name="gemini_status_idle">Gemini idle</string>
     <string name="gemini_no_result">No analysis yet</string>
+    <string name="prompt_section_title">Prompt</string>
+    <string name="prompt_field_label">Prompt para analise</string>
+    <string name="prompt_field_placeholder">Descreva o que quer que a IA analise</string>
+    <string name="prompt_partial_text">Parcial: %1$s</string>
+    <string name="stt_start">Falar prompt</string>
+    <string name="stt_stop">Parar escuta</string>
+    <string name="stt_listening">Escutando...</string>
+    <string name="tts_speak_response">Ler resposta</string>
+    <string name="tts_stop">Parar leitura</string>
+    <string name="tts_speaking">Lendo resposta...</string>
+    <string name="tts_ready">TTS pronto (pt-BR)</string>
+    <string name="tts_not_ready">TTS inicializando</string>
     <string name="logs_title">Execution logs</string>
     <string name="logs_clear">Clear</string>
     <string name="logs_empty">No logs yet</string>

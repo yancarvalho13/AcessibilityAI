@@ -184,6 +184,43 @@ val videoBytes = cameraApi.getLastVideoBytes()
 cameraApi.closeCamera()
 ```
 
+## Speech APIs (STT/TTS)
+
+Arquivos principais:
+
+- `app/src/main/java/com/example/myapplication/domain/speech/SpeechToTextApi.kt`
+- `app/src/main/java/com/example/myapplication/data/speech/AndroidSpeechToTextApi.kt`
+- `app/src/main/java/com/example/myapplication/domain/speech/TextToSpeechApi.kt`
+- `app/src/main/java/com/example/myapplication/data/speech/AndroidTextToSpeechApi.kt`
+
+### O que fazem
+
+- STT: usa `SpeechRecognizer` nativo em `pt-BR` para transformar voz em texto e preencher prompt.
+- TTS: usa `TextToSpeech` nativo em `pt-BR` para ler a resposta da IA em voz alta.
+
+### API STT
+
+```kotlin
+interface SpeechToTextApi {
+    val state: StateFlow<SpeechToTextState>
+    fun startListening()
+    fun stopListening()
+    fun cancelListening()
+    fun release()
+}
+```
+
+### API TTS
+
+```kotlin
+interface TextToSpeechApi {
+    val state: StateFlow<TextToSpeechState>
+    fun speak(text: String)
+    fun stop()
+    fun release()
+}
+```
+
 ## Permissoes
 
 Manifesto:

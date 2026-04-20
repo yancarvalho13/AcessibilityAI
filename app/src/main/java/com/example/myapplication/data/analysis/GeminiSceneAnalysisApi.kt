@@ -16,19 +16,19 @@ class GeminiSceneAnalysisApi(
     private val client: OkHttpClient = OkHttpClient(),
 ) : SceneAnalysisApi {
 
-    override suspend fun analyzePhoto(photoBytes: ByteArray): String {
+    override suspend fun analyzePhoto(photoBytes: ByteArray, prompt: String?): String {
         return analyze(
             bytes = photoBytes,
             mimeType = "image/jpeg",
-            prompt = BuildConfig.GEMINI_PHOTO_PROMPT,
+            prompt = prompt?.trim().takeUnless { it.isNullOrEmpty() } ?: BuildConfig.GEMINI_PHOTO_PROMPT,
         )
     }
 
-    override suspend fun analyzeVideo(videoBytes: ByteArray): String {
+    override suspend fun analyzeVideo(videoBytes: ByteArray, prompt: String?): String {
         return analyze(
             bytes = videoBytes,
             mimeType = "video/mp4",
-            prompt = BuildConfig.GEMINI_VIDEO_PROMPT,
+            prompt = prompt?.trim().takeUnless { it.isNullOrEmpty() } ?: BuildConfig.GEMINI_VIDEO_PROMPT,
         )
     }
 
