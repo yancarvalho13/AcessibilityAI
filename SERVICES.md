@@ -270,6 +270,7 @@ Arquivos principais:
   - `PhotoPromptStep`: escuta prompt livre e envia para analise Gemini da foto capturada.
 - Cada ciclo de escuta reseta timeout de 30 segundos.
 - Sem novos comandos por 30 segundos, o engine encerra automaticamente a sessao (`EndedStep`).
+- O `HeadlessVoiceService` emite logs por broadcast interno (`ACTION_HEADLESS_LOG`) e a tela `Voice Lab` exibe esses logs no card de logs.
 
 ### Intents de voz atuais no headless
 

@@ -1,7 +1,10 @@
 package com.example.myapplication
 
 import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -35,6 +38,19 @@ class MainActivity : ComponentActivity() {
     private var pendingCameraOwner: LifecycleOwner? = null
     private var pendingPreviewView: PreviewView? = null
     private var pendingAudioAction: AudioPermissionAction? = null
+
+    private val headlessLogReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != HeadlessVoiceService.ACTION_HEADLESS_LOG) {
+                return
+            }
+
+            val message = intent.getStringExtra(HeadlessVoiceService.EXTRA_LOG_MESSAGE).orEmpty()
+            if (message.isNotBlank()) {
+                voiceViewModel.appendHeadlessLog(message)
+            }
+        }
+    }
 
     private val voiceViewModel: MainViewModel by viewModels {
         val graph = (application as MyApplication).serviceGraph
@@ -147,6 +163,21 @@ class MainActivity : ComponentActivity() {
         voiceViewModel.refreshOverlayPermission()
         voiceViewModel.dismissInfoMessage()
         mediaViewModel.dismissInfoMessage()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        ContextCompat.registerReceiver(
+            this,
+            headlessLogReceiver,
+            IntentFilter(HeadlessVoiceService.ACTION_HEADLESS_LOG),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+    }
+
+    override fun onStop() {
+        unregisterReceiver(headlessLogReceiver)
+        super.onStop()
     }
 
     override fun onDestroy() {

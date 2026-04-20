@@ -3,6 +3,7 @@ package com.example.myapplication.data.speech
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -20,8 +21,13 @@ class AndroidSpeechToTextApi(
     override val state: StateFlow<SpeechToTextState> = _state.asStateFlow()
 
     private var speechRecognizer: SpeechRecognizer? = null
+    private var ignoreTransientErrorsUntilMs: Long = 0L
 
     override fun startListening() {
+        if (_state.value.isListening) {
+            return
+        }
+
         if (!SpeechRecognizer.isRecognitionAvailable(appContext)) {
             _state.value = _state.value.copy(
                 isListening = false,
@@ -41,16 +47,19 @@ class AndroidSpeechToTextApi(
         _state.value = _state.value.copy(
             isListening = true,
             partialText = "",
+            finalText = "",
             errorMessage = null,
         )
         recognizer.startListening(intent)
     }
 
     override fun stopListening() {
+        ignoreTransientErrorsUntilMs = SystemClock.elapsedRealtime() + TRANSIENT_ERROR_SUPPRESSION_MS
         speechRecognizer?.stopListening()
     }
 
     override fun cancelListening() {
+        ignoreTransientErrorsUntilMs = SystemClock.elapsedRealtime() + TRANSIENT_ERROR_SUPPRESSION_MS
         speechRecognizer?.cancel()
         _state.value = _state.value.copy(isListening = false, partialText = "")
     }
@@ -87,6 +96,15 @@ class AndroidSpeechToTextApi(
                     }
 
                     override fun onError(error: Int) {
+                        if (shouldIgnoreTransientError(error)) {
+                            _state.value = _state.value.copy(
+                                isListening = false,
+                                partialText = "",
+                                errorMessage = null,
+                            )
+                            return
+                        }
+
                         _state.value = _state.value.copy(
                             isListening = false,
                             partialText = "",
@@ -146,7 +164,20 @@ class AndroidSpeechToTextApi(
         }
     }
 
+    private fun shouldIgnoreTransientError(errorCode: Int): Boolean {
+        val withinSuppressionWindow = SystemClock.elapsedRealtime() < ignoreTransientErrorsUntilMs
+        if (!withinSuppressionWindow) {
+            return false
+        }
+
+        return errorCode == SpeechRecognizer.ERROR_CLIENT ||
+            errorCode == SpeechRecognizer.ERROR_NO_MATCH ||
+            errorCode == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
+            errorCode == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
+    }
+
     companion object {
         private val LOCALE_PT_BR = Locale.forLanguageTag("pt-BR").toLanguageTag()
+        private const val TRANSIENT_ERROR_SUPPRESSION_MS = 1_200L
     }
 }

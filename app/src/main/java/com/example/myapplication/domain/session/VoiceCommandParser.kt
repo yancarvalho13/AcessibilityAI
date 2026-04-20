@@ -57,7 +57,7 @@ class VoiceCommandParser {
         private val WHATSAPP_KEYWORDS = listOf("whatsapp", "whatsaap", "zap", "wpp")
         private val YOUTUBE_KEYWORDS = listOf("youtube", "you tube", "yt")
         private val CAMERA_KEYWORDS = listOf("camera", "abrir camera")
-        private val TAKE_PHOTO_KEYWORDS = listOf("tirar foto", "tire foto", "capturar foto", "bater foto")
+        private val TAKE_PHOTO_KEYWORDS = listOf("tirar foto", "tire foto", "capturar foto", "bater foto", "tira foto")
         private val VIDEO_START_KEYWORDS = listOf("gravar video", "iniciar video", "comecar video")
         private val VIDEO_STOP_KEYWORDS = listOf("parar video", "encerrar video")
         private val ANALYZE_PHOTO_KEYWORDS = listOf("analisar foto")
