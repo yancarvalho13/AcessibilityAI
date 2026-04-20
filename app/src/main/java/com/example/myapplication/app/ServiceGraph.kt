@@ -15,6 +15,8 @@ import com.example.myapplication.domain.overlay.OverlayServiceApi
 import com.example.myapplication.domain.speech.SpeechToTextApi
 import com.example.myapplication.domain.speech.TextToSpeechApi
 import com.example.myapplication.domain.voice.VoiceServiceApi
+import com.example.myapplication.service.HeadlessCameraApi
+import com.example.myapplication.service.HeadlessCameraController
 
 class ServiceGraph(context: Context) {
     private val appContext = context.applicationContext
@@ -45,5 +47,9 @@ class ServiceGraph(context: Context) {
 
     val appLauncherApi: AppLauncherApi by lazy {
         AndroidAppLauncherApi(appContext)
+    }
+
+    val headlessCameraApi: HeadlessCameraApi by lazy {
+        HeadlessCameraController(appContext)
     }
 }

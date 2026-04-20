@@ -5,8 +5,7 @@ import android.content.Intent
 import com.example.myapplication.domain.app.AppLaunchResult
 import com.example.myapplication.domain.app.AppLaunchStatus
 import com.example.myapplication.domain.app.AppLauncherApi
-import java.text.Normalizer
-import java.util.Locale
+import com.example.myapplication.domain.text.CommandTextNormalizer
 
 class AndroidAppLauncherApi(
     private val appContext: Context,
@@ -89,11 +88,7 @@ class AndroidAppLauncherApi(
     }
 
     private fun normalize(value: String): String {
-        val lower = value.lowercase(Locale.ROOT)
-        val noAccents = Normalizer
-            .normalize(lower, Normalizer.Form.NFD)
-            .replace("\\p{Mn}+".toRegex(), "")
-        return noAccents.trim()
+        return CommandTextNormalizer.normalize(value)
     }
 
     companion object {

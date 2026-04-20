@@ -3,23 +3,24 @@ package com.example.myapplication.service
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import com.example.myapplication.R
-import com.example.myapplication.data.analysis.GeminiSceneAnalysisApi
-import com.example.myapplication.data.app.AndroidAppLauncherApi
-import com.example.myapplication.data.speech.AndroidSpeechToTextApi
-import com.example.myapplication.data.speech.AndroidTextToSpeechApi
+import com.example.myapplication.app.MyApplication
 import com.example.myapplication.domain.session.VoiceSessionAction
 import com.example.myapplication.domain.session.VoiceSessionEngine
+import com.example.myapplication.domain.text.CommandTextNormalizer
 import androidx.lifecycle.LifecycleService
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -32,11 +33,12 @@ class HeadlessVoiceService : LifecycleService() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
     private val timeoutHandler = Handler(Looper.getMainLooper())
 
-    private val speechToTextApi by lazy { AndroidSpeechToTextApi(applicationContext) }
-    private val textToSpeechApi by lazy { AndroidTextToSpeechApi(applicationContext) }
-    private val appLauncherApi by lazy { AndroidAppLauncherApi(applicationContext) }
-    private val sceneAnalysisApi by lazy { GeminiSceneAnalysisApi() }
-    private val cameraController by lazy { HeadlessCameraController(applicationContext) }
+    private val serviceGraph by lazy { (application as MyApplication).serviceGraph }
+    private val speechToTextApi by lazy { serviceGraph.speechToTextApi }
+    private val textToSpeechApi by lazy { serviceGraph.textToSpeechApi }
+    private val appLauncherApi by lazy { serviceGraph.appLauncherApi }
+    private val sceneAnalysisApi by lazy { serviceGraph.sceneAnalysisApi }
+    private val cameraController by lazy { serviceGraph.headlessCameraApi }
     private val commandExecutor by lazy {
         HeadlessCommandExecutor(
             appLauncherApi = appLauncherApi,
@@ -51,7 +53,10 @@ class HeadlessVoiceService : LifecycleService() {
     private var suppressSttUntilMs: Long = 0L
     private var pendingSuppressedCommand: String? = null
     private var pendingCommandRunnable: Runnable? = null
+    private var timeoutToken: Long = 0L
     private val actionMutex = Mutex()
+    private var activeActionJob: Job? = null
+    private var currentExecutionJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -61,6 +66,13 @@ class HeadlessVoiceService : LifecycleService() {
             speechToTextApi.state.collectLatest { sttState ->
                 val finalText = sttState.finalText.trim()
                 if (finalText.isNotEmpty() && finalText != lastHandledFinalText) {
+                    if (isGlobalCancelCommand(finalText)) {
+                        emitLog("Headless STT: cancelamento global reconhecido ($finalText)")
+                        lastHandledFinalText = finalText
+                        cancelCurrentFlowAndRestart()
+                        return@collectLatest
+                    }
+
                     val now = SystemClock.elapsedRealtime()
                     if (now < suppressSttUntilMs || textToSpeechApi.state.value.isSpeaking) {
                         emitLog("Headless STT: ignorado durante fala do TTS ($finalText)")
@@ -97,9 +109,16 @@ class HeadlessVoiceService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action ?: ACTION_START_SESSION
-        if (action == ACTION_START_SESSION) {
-            emitLog("Headless sessao: iniciando step engine")
-            processActions(engine.start())
+        when (action) {
+            ACTION_START_SESSION -> {
+                emitLog("Headless sessao: iniciando step engine")
+                processActions(engine.start())
+            }
+
+            ACTION_CANCEL_FLOW -> {
+                emitLog("Headless sessao: cancelamento solicitado por intent")
+                cancelCurrentFlowAndRestart()
+            }
         }
         return START_NOT_STICKY
     }
@@ -116,10 +135,10 @@ class HeadlessVoiceService : LifecycleService() {
     }
 
     private fun processActions(actions: List<VoiceSessionAction>) {
-        serviceScope.launch {
+        activeActionJob = serviceScope.launch {
             actionMutex.withLock {
                 for (action in actions) {
-                    runCatching {
+                    try {
                         when (action) {
                             is VoiceSessionAction.Speak -> {
                                 emitLog("Headless action: Speak")
@@ -143,11 +162,11 @@ class HeadlessVoiceService : LifecycleService() {
                             }
 
                             is VoiceSessionAction.ExecuteCommand -> {
+                                clearTimeout()
+
                                 emitLog("Headless action: ExecuteCommand (${action.intent})")
-                                val execution = commandExecutor.execute(action.intent, action.rawCommand)
-                                execution.logMessage?.let { emitLog(it) }
-                                reserveSttSuppression(execution.feedbackText)
-                                textToSpeechApi.speak(execution.feedbackText)
+                                val execution = runCancelableCommand(action)
+                                emitExecutionFeedback(execution)
                             }
 
                             VoiceSessionAction.StopSession -> {
@@ -155,7 +174,10 @@ class HeadlessVoiceService : LifecycleService() {
                                 stopSelf()
                             }
                         }
-                    }.onFailure { error ->
+                    } catch (cancelled: CancellationException) {
+                        emitLog("Headless action: cancelada")
+                        throw cancelled
+                    } catch (error: Throwable) {
                         emitLog("Headless erro: falha ao processar action (${error.message ?: "erro desconhecido"})")
                         textToSpeechApi.speak("Erro interno ao processar o comando")
                     }
@@ -164,17 +186,24 @@ class HeadlessVoiceService : LifecycleService() {
         }
     }
 
-    private fun resetTimeout() {
+    private fun resetTimeout(timeoutMs: Long = SESSION_TIMEOUT_MS) {
         clearTimeout()
+        timeoutToken += 1L
+        val token = timeoutToken
         val runnable = Runnable {
-            emitLog("Headless sessao: timeout de 30s")
+            if (token != timeoutToken) {
+                return@Runnable
+            }
+
+            emitLog("Headless sessao: timeout de ${timeoutMs / 1000}s")
             processActions(engine.onTimeout())
         }
         timeoutRunnable = runnable
-        timeoutHandler.postDelayed(runnable, SESSION_TIMEOUT_MS)
+        timeoutHandler.postDelayed(runnable, timeoutMs)
     }
 
     private fun clearTimeout() {
+        timeoutToken += 1L
         timeoutRunnable?.let { timeoutHandler.removeCallbacks(it) }
         timeoutRunnable = null
     }
@@ -188,10 +217,20 @@ class HeadlessVoiceService : LifecycleService() {
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(channel)
 
+        val cancelIntent = Intent(this, HeadlessVoiceService::class.java)
+            .setAction(ACTION_CANCEL_FLOW)
+        val cancelPendingIntent = PendingIntent.getService(
+            this,
+            201,
+            cancelIntent,
+            PendingIntent.FLAG_IMMUTABLE,
+        )
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle(getString(R.string.headless_notification_title))
             .setContentText(getString(R.string.headless_notification_text))
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancelar fluxo", cancelPendingIntent)
             .setOngoing(true)
             .build()
     }
@@ -245,6 +284,47 @@ class HeadlessVoiceService : LifecycleService() {
         pendingCommandRunnable = null
     }
 
+    private fun cancelCurrentFlowAndRestart() {
+        clearTimeout()
+        clearPendingCommandRunnable()
+        pendingSuppressedCommand = null
+        suppressSttUntilMs = 0L
+        lastHandledFinalText = ""
+        currentExecutionJob?.cancel(CancellationException("fluxo cancelado"))
+        currentExecutionJob = null
+        activeActionJob?.cancel(CancellationException("fluxo cancelado"))
+        activeActionJob = null
+        speechToTextApi.cancelListening()
+        textToSpeechApi.stop()
+        processActions(engine.start())
+    }
+
+    private suspend fun runCancelableCommand(action: VoiceSessionAction.ExecuteCommand): HeadlessCommandExecution {
+        val deferred = serviceScope.async {
+            commandExecutor.execute(
+                intent = action.intent,
+                rawCommand = action.rawCommand,
+                onProgress = { progress ->
+                    emitExecutionFeedback(progress)
+                },
+            )
+        }
+        currentExecutionJob = deferred
+        return try {
+            deferred.await()
+        } finally {
+            if (currentExecutionJob == deferred) {
+                currentExecutionJob = null
+            }
+        }
+    }
+
+    private fun emitExecutionFeedback(execution: HeadlessCommandExecution) {
+        execution.logMessage?.let { emitLog(it) }
+        reserveSttSuppression(execution.feedbackText)
+        textToSpeechApi.speak(execution.feedbackText)
+    }
+
     private suspend fun startListeningWhenReady() {
         repeat(MAX_LISTEN_WAIT_TICKS) {
             val now = SystemClock.elapsedRealtime()
@@ -263,8 +343,18 @@ class HeadlessVoiceService : LifecycleService() {
             errorMessage == "Tempo de fala esgotado"
     }
 
+    private fun isGlobalCancelCommand(rawText: String): Boolean {
+        val normalized = CommandTextNormalizer.normalize(rawText)
+
+        return normalized.contains("cancelar") ||
+            normalized.contains("cancela") ||
+            normalized.contains("encerrar fluxo") ||
+            normalized.contains("parar sessao")
+    }
+
     companion object {
         const val ACTION_START_SESSION = "com.example.myapplication.action.START_HEADLESS_SESSION"
+        const val ACTION_CANCEL_FLOW = "com.example.myapplication.action.CANCEL_HEADLESS_FLOW"
         const val ACTION_HEADLESS_LOG = "com.example.myapplication.action.HEADLESS_LOG"
         const val EXTRA_LOG_MESSAGE = "extra_log_message"
 

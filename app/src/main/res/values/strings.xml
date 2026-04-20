@@ -15,6 +15,7 @@
     <string name="headless_description">Ao iniciar, o app fala e escuta comandos por 30 segundos.</string>
     <string name="headless_start">Iniciar headless</string>
     <string name="headless_stop">Parar headless</string>
+    <string name="headless_cancel_flow">Cancelar fluxo atual</string>
     <string name="headless_notification_title">Assistente de voz ativo</string>
     <string name="headless_notification_text">Escutando comandos em segundo plano</string>
     <string name="overlay_permission_granted">Overlay permission: granted</string>

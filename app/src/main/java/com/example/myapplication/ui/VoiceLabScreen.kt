@@ -33,6 +33,7 @@ fun VoiceLabScreen(
     onShowOverlay: () -> Unit,
     onStartHeadlessSession: () -> Unit,
     onStopHeadlessSession: () -> Unit,
+    onCancelHeadlessFlow: () -> Unit,
     onClearLogs: () -> Unit,
 ) {
     Column(
@@ -138,6 +139,13 @@ fun VoiceLabScreen(
                     ) {
                         Text(stringResource(R.string.headless_stop))
                     }
+                }
+
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onCancelHeadlessFlow,
+                ) {
+                    Text(stringResource(R.string.headless_cancel_flow))
                 }
             }
         }

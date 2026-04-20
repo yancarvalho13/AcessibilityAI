@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
     private var pendingCameraOwner: LifecycleOwner? = null
     private var pendingPreviewView: PreviewView? = null
     private var pendingAudioAction: AudioPermissionAction? = null
+    private var hasStartedHeadlessAtLeastOnce: Boolean = false
 
     private val headlessLogReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -129,6 +130,7 @@ class MainActivity : ComponentActivity() {
                                 onShowOverlay = voiceViewModel::showOverlay,
                                 onStartHeadlessSession = ::ensureHeadlessSessionStarted,
                                 onStopHeadlessSession = ::stopHeadlessSession,
+                                onCancelHeadlessFlow = ::cancelHeadlessFlow,
                                 onClearLogs = voiceViewModel::clearLogs,
                             )
 
@@ -155,7 +157,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        ensureHeadlessSessionStarted()
     }
 
     override fun onResume() {
@@ -173,6 +174,13 @@ class MainActivity : ComponentActivity() {
             IntentFilter(HeadlessVoiceService.ACTION_HEADLESS_LOG),
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
+
+        if (!hasStartedHeadlessAtLeastOnce) {
+            hasStartedHeadlessAtLeastOnce = true
+            ensureHeadlessSessionStarted()
+        } else {
+            restartHeadlessSessionIfPermitted()
+        }
     }
 
     override fun onStop() {
@@ -237,9 +245,28 @@ class MainActivity : ComponentActivity() {
         voiceViewModel.appendHeadlessLog("Headless: sessao iniciada")
     }
 
+    private fun restartHeadlessSessionIfPermitted() {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.RECORD_AUDIO,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!hasPermission) {
+            return
+        }
+
+        startHeadlessSession()
+    }
+
     private fun stopHeadlessSession() {
         stopService(Intent(this, HeadlessVoiceService::class.java))
         voiceViewModel.appendHeadlessLog("Headless: sessao encerrada")
+    }
+
+    private fun cancelHeadlessFlow() {
+        val intent = Intent(this, HeadlessVoiceService::class.java)
+            .setAction(HeadlessVoiceService.ACTION_CANCEL_FLOW)
+        ContextCompat.startForegroundService(this, intent)
+        voiceViewModel.appendHeadlessLog("Headless: cancelamento solicitado")
     }
 
     private fun onOpenCameraClicked(lifecycleOwner: LifecycleOwner, previewView: PreviewView) {

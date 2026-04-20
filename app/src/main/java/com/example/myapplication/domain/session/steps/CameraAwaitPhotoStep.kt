@@ -8,7 +8,7 @@ import com.example.myapplication.domain.session.VoiceSessionContext
 class CameraAwaitPhotoStep(
     private val parser: VoiceCommandParser,
 ) : VoiceSessionStep {
-    override val id: String = "camera_await_photo"
+    override val id: String = "camera_await_action"
 
     override fun onEnter(context: VoiceSessionContext): VoiceStepResult {
         return VoiceStepResult(
@@ -32,6 +32,10 @@ class CameraAwaitPhotoStep(
                 VoiceStepResult(nextStep = CapturePhotoStep(parser))
             }
 
+            VoiceCommandIntent.StartVideo -> {
+                VoiceStepResult(nextStep = StartVideoStep(parser))
+            }
+
             VoiceCommandIntent.StopSession -> {
                 VoiceStepResult(
                     actions = listOf(VoiceSessionAction.Speak("Encerrando escuta")),
@@ -41,7 +45,7 @@ class CameraAwaitPhotoStep(
 
             else -> {
                 VoiceStepResult(
-                    actions = listOf(VoiceSessionAction.Speak("Diga tirar foto para capturar")),
+                    actions = listOf(VoiceSessionAction.Speak("Diga tirar foto ou iniciar gravacao")),
                     nextStep = CameraAwaitPhotoStep(parser),
                 )
             }

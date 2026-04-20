@@ -39,4 +39,39 @@ class VoiceSessionEngineTest {
         )
         assertTrue(analyzeActions.any { it is VoiceSessionAction.StartListening })
     }
+
+    @Test
+    fun `camera flow should chain start video stop and analyze steps`() {
+        val engine = VoiceSessionEngine()
+
+        engine.start()
+        engine.onUserInput("abrir camera")
+
+        val startVideoActions = engine.onUserInput("iniciar gravacao")
+        assertTrue(startVideoActions.any { it is VoiceSessionAction.StopListening })
+        assertTrue(
+            startVideoActions.any {
+                it is VoiceSessionAction.ExecuteCommand && it.intent == VoiceCommandIntent.StartVideo
+            },
+        )
+        assertTrue(startVideoActions.any { it is VoiceSessionAction.StartListening })
+
+        val stopVideoActions = engine.onUserInput("parar.")
+        assertTrue(stopVideoActions.any { it is VoiceSessionAction.StopListening })
+        assertTrue(
+            stopVideoActions.any {
+                it is VoiceSessionAction.ExecuteCommand && it.intent == VoiceCommandIntent.StopVideo
+            },
+        )
+        assertTrue(stopVideoActions.any { it is VoiceSessionAction.StartListening })
+
+        val analyzeActions = engine.onUserInput("descreva o video")
+        assertTrue(analyzeActions.any { it is VoiceSessionAction.StopListening })
+        assertTrue(
+            analyzeActions.any {
+                it is VoiceSessionAction.ExecuteCommand && it.intent == VoiceCommandIntent.AnalyzeVideo
+            },
+        )
+        assertTrue(analyzeActions.any { it is VoiceSessionAction.StartListening })
+    }
 }

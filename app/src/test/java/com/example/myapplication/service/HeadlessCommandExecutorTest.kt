@@ -8,7 +8,9 @@ import com.example.myapplication.domain.session.VoiceCommandIntent
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
+import kotlin.coroutines.cancellation.CancellationException
 
 class HeadlessCommandExecutorTest {
 
@@ -59,6 +61,7 @@ class HeadlessCommandExecutorTest {
     @Test
     fun `analyze photo should use captured image with prompt`() = runBlocking {
         val sceneApi = FakeSceneAnalysisApi()
+        val progressMessages = mutableListOf<String>()
         val executor = HeadlessCommandExecutor(
             appLauncherApi = FakeAppLauncherApi(),
             cameraController = FakeHeadlessCameraApi(
@@ -70,11 +73,67 @@ class HeadlessCommandExecutorTest {
         )
 
         executor.execute(VoiceCommandIntent.TakePhoto, "tirar foto")
-        val analyzeResult = executor.execute(VoiceCommandIntent.AnalyzePhoto, "descreva a foto")
+        val analyzeResult = executor.execute(
+            intent = VoiceCommandIntent.AnalyzePhoto,
+            rawCommand = "descreva a foto",
+            onProgress = { progress -> progressMessages += progress.feedbackText },
+        )
 
         assertEquals("analise-ok", analyzeResult.feedbackText)
+        assertTrue(progressMessages.contains("Analise em andamento"))
         assertEquals("descreva a foto", sceneApi.lastPrompt)
         assertTrue(sceneApi.lastPhotoBytes?.isNotEmpty() == true)
+    }
+
+    @Test
+    fun `start stop and analyze video should use recorded bytes`() = runBlocking {
+        val sceneApi = FakeSceneAnalysisApi()
+        val camera = FakeHeadlessCameraApi(
+            openCameraResult = true,
+            firstCaptureThrows = false,
+            secondCaptureBytes = byteArrayOf(1),
+            videoStartResult = true,
+            videoStopBytes = byteArrayOf(4, 5, 6),
+        )
+
+        val executor = HeadlessCommandExecutor(
+            appLauncherApi = FakeAppLauncherApi(),
+            cameraController = camera,
+            sceneAnalysisApi = sceneApi,
+        )
+
+        val start = executor.execute(VoiceCommandIntent.StartVideo, "iniciar gravacao")
+        assertEquals("Gravacao iniciada. Diga parar para finalizar.", start.feedbackText)
+
+        val stop = executor.execute(VoiceCommandIntent.StopVideo, "parar")
+        assertEquals("Video salvo. O que deseja fazer com o video?", stop.feedbackText)
+
+        val analyze = executor.execute(VoiceCommandIntent.AnalyzeVideo, "resuma o video")
+        assertEquals("video-ok", analyze.feedbackText)
+        assertEquals("resuma o video", sceneApi.lastVideoPrompt)
+        assertTrue(sceneApi.lastVideoBytes?.isNotEmpty() == true)
+    }
+
+    @Test
+    fun `analyze photo should propagate cancellation`() = runBlocking {
+        val sceneApi = FakeSceneAnalysisApi(throwOnAnalyzePhoto = true)
+        val executor = HeadlessCommandExecutor(
+            appLauncherApi = FakeAppLauncherApi(),
+            cameraController = FakeHeadlessCameraApi(
+                openCameraResult = true,
+                firstCaptureThrows = false,
+                secondCaptureBytes = byteArrayOf(7, 7),
+            ),
+            sceneAnalysisApi = sceneApi,
+        )
+
+        executor.execute(VoiceCommandIntent.TakePhoto, "tirar foto")
+
+        try {
+            executor.execute(VoiceCommandIntent.AnalyzePhoto, "descreva")
+            fail("Expected CancellationException")
+        } catch (_: CancellationException) {
+        }
     }
 
     private class FakeHeadlessCameraApi(
@@ -82,6 +141,8 @@ class HeadlessCommandExecutorTest {
         private val firstCaptureThrows: Boolean,
         private val secondCaptureThrows: Boolean = false,
         private val secondCaptureBytes: ByteArray,
+        private val videoStartResult: Boolean = false,
+        private val videoStopBytes: ByteArray? = null,
     ) : HeadlessCameraApi {
         var openCameraCalls: Int = 0
         var takePhotoCalls: Int = 0
@@ -102,6 +163,14 @@ class HeadlessCommandExecutorTest {
             return secondCaptureBytes
         }
 
+        override fun startVideoRecording(): Boolean {
+            return videoStartResult
+        }
+
+        override suspend fun stopVideoBytes(): ByteArray? {
+            return videoStopBytes
+        }
+
         override fun release() {
         }
     }
@@ -120,17 +189,26 @@ class HeadlessCommandExecutorTest {
         }
     }
 
-    private class FakeSceneAnalysisApi : SceneAnalysisApi {
+    private class FakeSceneAnalysisApi(
+        private val throwOnAnalyzePhoto: Boolean = false,
+    ) : SceneAnalysisApi {
         var lastPhotoBytes: ByteArray? = null
         var lastPrompt: String? = null
+        var lastVideoBytes: ByteArray? = null
+        var lastVideoPrompt: String? = null
 
         override suspend fun analyzePhoto(photoBytes: ByteArray, prompt: String?): String {
+            if (throwOnAnalyzePhoto) {
+                throw CancellationException("cancelled")
+            }
             lastPhotoBytes = photoBytes
             lastPrompt = prompt
             return "analise-ok"
         }
 
         override suspend fun analyzeVideo(videoBytes: ByteArray, prompt: String?): String {
+            lastVideoBytes = videoBytes
+            lastVideoPrompt = prompt
             return "video-ok"
         }
     }
